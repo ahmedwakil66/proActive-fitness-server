@@ -97,6 +97,12 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/users/:id', async(req, res) => {
+            const id = req.params.id;
+            const result = await userCollection.findOne({ _id: new ObjectId(id) });
+            res.send(result);
+        })
+
         app.get('/users/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const decodedEmail = req.decoded.user.email;
@@ -201,6 +207,12 @@ async function run() {
             })
             const topInstructors = await userCollection.find({ email: { $in: topSixInstructorEmails } }).toArray();
             res.send(topInstructors.slice(0, 6));
+        })
+
+        app.get('/instructor-classes/:instructorEmail', async(req, res) => {
+            const instructorEmail = req.params.instructorEmail;
+            const result = await classCollection.find({instructor_email: instructorEmail}, {sort: {enrolled_count: -1}}).toArray();
+            res.send(result);
         })
 
 
