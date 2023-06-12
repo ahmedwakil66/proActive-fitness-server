@@ -103,7 +103,7 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/users/:email', verifyJWT, async (req, res) => {
+        app.get('/users-by-email/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const decodedEmail = req.decoded.user.email;
             if(decodedEmail !== email){
