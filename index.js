@@ -131,7 +131,7 @@ async function run() {
                 return res.send(result);
             }
             if (req.query.email) {
-                const result = await classCollection.find({ instructor_email: req.query.email }).toArray();
+                const result = await classCollection.find({ instructor_email: req.query.email }, {sort: {enrolled_count: -1}}).toArray();
                 return res.send(result);
             }
             const result = await classCollection.find({}, { sort: { status: -1 } }).toArray();
@@ -207,12 +207,6 @@ async function run() {
             })
             const topInstructors = await userCollection.find({ email: { $in: topSixInstructorEmails } }).toArray();
             res.send(topInstructors.slice(0, 6));
-        })
-
-        app.get('/instructor-classes/:instructorEmail', verifyJWT, async(req, res) => {
-            const instructorEmail = req.params.instructorEmail;
-            const result = await classCollection.find({instructor_email: instructorEmail}, {sort: {enrolled_count: -1}}).toArray();
-            res.send(result);
         })
 
 
