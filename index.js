@@ -47,6 +47,7 @@ async function run() {
         const userCollection = client.db('proActiveFitnessDB').collection('users');
         const classCollection = client.db('proActiveFitnessDB').collection('classes');
         const paymentCollection = client.db('proActiveFitnessDB').collection('payments');
+        const messageCollection = client.db('proActiveFitnessDB').collection('messages');
 
         //generate jwt token
         app.post('/jwt', async (req, res) => {
@@ -97,7 +98,7 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/users/:id', verifyJWT, async(req, res) => {
+        app.get('/users/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const result = await userCollection.findOne({ _id: new ObjectId(id) });
             res.send(result);
@@ -105,10 +106,10 @@ async function run() {
 
         app.get('/users-by-email/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-            const decodedEmail = req.decoded.user.email;
-            if(decodedEmail !== email){
-                return res.status(403).send({error: true, message: 'forbidden access'})
-            }
+            // const decodedEmail = req.decoded.user.email;
+            // if (decodedEmail !== email) {
+            //     return res.status(403).send({ error: true, message: 'forbidden access' })
+            // }
             const result = await userCollection.findOne({ email: email });
             res.send(result);
         })
@@ -131,7 +132,7 @@ async function run() {
                 return res.send(result);
             }
             if (req.query.email) {
-                const result = await classCollection.find({ instructor_email: req.query.email }, {sort: {enrolled_count: -1}}).toArray();
+                const result = await classCollection.find({ instructor_email: req.query.email }, { sort: { enrolled_count: -1 } }).toArray();
                 return res.send(result);
             }
             const result = await classCollection.find({}, { sort: { status: -1 } }).toArray();
@@ -211,10 +212,60 @@ async function run() {
 
 
         //================================================
+        //=========== message related apis ==============
+        //================================================
+        app.get('/messages-senders/:userEmail', async (req, res) => {
+            const userEmail = req.params.userEmail;
+            const senderEmailsRaw = await messageCollection.aggregate([
+                { $match: { receiver: userEmail } },
+                { $sort: {created: -1}},
+                { $group: { _id: '$sender'} },
+                { $project: { _id: 0, sender: '$_id' } }
+            ]).toArray();
+
+            const senderEmails = senderEmailsRaw.map(item => item.sender);
+            const options = { projection: {email: 1, name: 1, image: 1}}
+            const senders = await userCollection.find({email: {$in: senderEmails}}, options).toArray();
+            res.send({senderEmails, senders})
+        })
+
+        //receive relation property and return all messages for that relation
+        app.post('/messages-by-relation', async(req, res) => {
+            const relation = req.body.relation;
+            if(!relation || !Array.isArray(relation)){
+                return res.send({error: true, message: 'invalid relation'})
+            }
+            const messages = await messageCollection.find({relation: {$all: relation}}).toArray();
+            console.log(relation, messages);
+            res.send(messages);
+        })
+
+        app.post('/messages', verifyJWT, async (req, res) => {
+            const message = req.body;
+
+            if (message.sender !== req.decoded.user.email) {
+                return res.status(403).send({ error: true, message: 'forbidden access' })
+            }
+
+            message.created = new Date().getTime();
+            message.relation = [message.sender, message.receiver];
+            message.status = 'sent',
+                message.moderation = {
+                    isReported: false,
+                    reportedAt: null,
+                    reporter: null,
+                }
+
+            const result = await messageCollection.insertOne(message);
+            res.send(result);
+        })
+
+
+        //================================================
         //=========== payments related apis ==============
         //================================================
         app.get('/payments/:email', async (req, res) => {
-            const payments = await paymentCollection.find({ email: req.params.email }, {sort: {created: -1}}).toArray();
+            const payments = await paymentCollection.find({ email: req.params.email }, { sort: { created: -1 } }).toArray();
             res.send(payments);
         })
 
